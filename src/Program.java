@@ -4,20 +4,24 @@ import java.awt.image.WritableRaster;
 import javax.imageio.ImageIO;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 
 
 public class Program {
     private static PNGmaker pngMaker;
+    
     public static void main(String[] args) throws Exception {
-        // ./yourprogram exampleInput.txt
+        // // ./yourprogram exampleInput.txt
         if (args.length != 1) {
             System.out.println("Invalid Input");
             return;
         }
         //Process Input File
         ProcessFile(args[0]);
+        // String file = "./files/rast-smoothcolor.txt";
+        // ProcessFile(file);
     }
     
     // Read and process the txt file line by line 
@@ -33,6 +37,7 @@ public class Program {
                 String[] infos = line.split("\\s+");
                 updatePNGmaker(infos);
             }
+            pngMaker.createImage("rast-output.png");
         } catch (IOException e) {
             System.err.println("Invalid Input File Path");
             e.printStackTrace();
@@ -57,12 +62,15 @@ public class Program {
                 pngMaker.processPositions(infos);
                 break;
             case "color":
+                pngMaker.processColors(infos);
                 break;
             case "drawArraysTriangles":
+                pngMaker.processDrawArraysTriangles(Integer.parseInt(infos[1]), Integer.parseInt(infos[2]));
                 break;
             case "depth":
                 break;
             case "sRGB":
+                pngMaker.processSRGB();
                 break;
             case "hyp":
                 break;

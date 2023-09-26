@@ -1,4 +1,14 @@
-.PHONEY: build, run, clean
+# .PHONEY: build, run
+
+# build: Program.class
+
+# run: Program.class
+# 	java Program
+
+# Program.class: Program.java
+# 	javac Program.java
+
+.PHONY: build, run, clean
 
 # <make clean> Win11 and Linux compatibility
 ifeq ($(OS),Windows_NT)
@@ -13,7 +23,7 @@ run: Program.class
 	java Program $(file)
 
 clean:
-	$(CLEAN) Program.class
+	$(CLEAN) *.class
 
 Program.class: Program.java
 	javac Program.java
