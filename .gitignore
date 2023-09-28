@@ -1,0 +1,6 @@
+/bin/
+!*.java
+*.png
+*.txt
+*.zip
+*.class
