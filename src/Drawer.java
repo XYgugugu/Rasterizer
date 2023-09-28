@@ -8,14 +8,26 @@ public class Drawer {
         // x,y,z,w,X,Y,R,G,B,A;
         double[] vector;
         //Concatenate position and color vector into one
-        Vector(double[] pos, double[] color) {
+        Vector(double[] pos, double[] color, boolean hyp) {
             vector = new double[pos.length+color.length];
             int i = 0;
-            for (double d : pos) {
-                vector[i++] = d;
-            }
-            for (double d : color) {
-                vector[i++] = d;
+            // Perform a separate operation for hyperbolic mode
+            if (hyp == true) {
+                double w = pos[3];
+                for (double d : pos) {
+                    vector[i++] = d/w;
+                }
+                for (double d : color) {
+                    vector[i++] = d/w;
+                }
+                vector[3] = 1/w;
+            } else {
+                for (double d : pos) {
+                    vector[i++] = d;
+                }
+                for (double d : color) {
+                    vector[i++] = d;
+                }
             }
         }
         //Copy constructor
@@ -79,7 +91,7 @@ public class Drawer {
     private int width, height;
     private Flags flags;
     /**
-     * This region is specifically for:         drawArraysTriangles
+     * This region is specifically for:         drawTriangles
      */
     private Vector t, b, m;
     // Assign three vertex in order based on Y-coordinate value
@@ -89,35 +101,35 @@ public class Drawer {
         height = h;
         // Find three Vectors in order
         if (pos0[5] < pos1[5] && pos0[5] < pos2[5]) {
-            t = new Vector(pos0, color0);
+            t = new Vector(pos0, color0, f.hyp);
             if (pos1[5] < pos2[5]) {
-                m = new Vector(pos1, color1);
-                b = new Vector(pos2, color2);
+                m = new Vector(pos1, color1, f.hyp);
+                b = new Vector(pos2, color2, f.hyp);
             } else {
-                m = new Vector(pos2, color2);
-                b = new Vector(pos1, color1);
+                m = new Vector(pos2, color2, f.hyp);
+                b = new Vector(pos1, color1, f.hyp);
             }
         } else if (pos1[5] < pos2[5]) {
-            t = new Vector(pos1, color1);
+            t = new Vector(pos1, color1, f.hyp);
             if (pos0[5] < pos2[5]) {
-                m = new Vector(pos0, color0);
-                b = new Vector(pos2, color2);
+                m = new Vector(pos0, color0, f.hyp);
+                b = new Vector(pos2, color2, f.hyp);
             } else {
-                m = new Vector(pos2, color2);
-                b = new Vector(pos0, color0);
+                m = new Vector(pos2, color2, f.hyp);
+                b = new Vector(pos0, color0, f.hyp);
             }
         } else {
-            t = new Vector(pos2, color2);
+            t = new Vector(pos2, color2, f.hyp);
             if (pos0[5] < pos1[5]) {
-                m = new Vector(pos0, color0);
-                b = new Vector(pos1, color1);
+                m = new Vector(pos0, color0, f.hyp);
+                b = new Vector(pos1, color1, f.hyp);
             } else {
-                m = new Vector(pos1, color1);
-                b = new Vector(pos0, color0);
+                m = new Vector(pos1, color1, f.hyp);
+                b = new Vector(pos0, color0, f.hyp);
             }
         }
     }
-    public void drawArraysTriangles(WritableRaster raster) {
+    public void drawTriangles(WritableRaster raster) {
         //dimension for Y-pos
         int d = 5;
         //DDA t to b:
@@ -182,7 +194,7 @@ public class Drawer {
     private void DDA8(Vector p, Vector s, Vector plong, Vector slong, double endPoint, WritableRaster raster) {
         int X = 4, Y = 5;
         while (p.GetDimension(Y) < endPoint) {
-            System.out.println("DDA8: " + plong.XYtoString() + plong.RGBtoString() + " to " + p.XYtoString() + p.RGBtoString());
+            // System.out.println("DDA8: " + plong.XYtoString() + plong.RGBtoString() + " to " + p.XYtoString() + p.RGBtoString());
             DDADraw(p, plong, X, raster);
             p.add(s);
             plong.add(slong);
@@ -197,28 +209,39 @@ public class Drawer {
         if (ps == null) return;
         double endPoint = Math.max(a.GetDimension(xDimension), b.GetDimension(xDimension));
         while (ps[0].GetDimension(xDimension) < endPoint) {
-            System.out.println(String.format("(x,y) = (%f, %f)", ps[0].GetDimension(xDimension), ps[0].GetDimension(xDimension + 1)));
+            // System.out.println(String.format("(x,y) = (%f, %f)", ps[0].GetDimension(xDimension), ps[0].GetDimension(xDimension + 1)));
             int x = (int) ps[0].GetDimension(xDimension);
             int y = (int) ps[0].GetDimension(xDimension + 1);
             if (x < 0 || x >= width || y < 0 || y >= height) {
                 ps[0].add(ps[1]);
                 continue;
             }
-            raster.setPixel(
-                            // x >= 0 ? (x < 60 ? x : 60) : 0, 
-                            // y >= 0 ? (y < 60 ? y : 60) : 0, 
-                            x,
-                            y,
-                            new double[]{
-                                        // (int) (ps[0].GetDimension(xDimension + 2) * 255),
-                                        // (int) (ps[0].GetDimension(xDimension + 3) * 255), 
-                                        // (int) (ps[0].GetDimension(xDimension + 4) * 255),
-                                        (255*GammaCorection(ps[0].GetDimension(xDimension + 2))),
-                                        (255*GammaCorection(ps[0].GetDimension(xDimension + 3))),
-                                        (255*GammaCorection(ps[0].GetDimension(xDimension + 4))),
-                                        255.0
-                                        }     
-                            );
+            if (flags.hyp == true) {
+                // Perform a separate operation for hyperbolic mode
+                // Undo divided-by-w
+                double WPrime = ps[0].GetDimension(xDimension - 1);
+                raster.setPixel(
+                                x,
+                                y,
+                                new double[]{
+                                            (255*GammaCorection(ps[0].GetDimension(xDimension + 2)) / WPrime),
+                                            (255*GammaCorection(ps[0].GetDimension(xDimension + 3)) / WPrime),
+                                            (255*GammaCorection(ps[0].GetDimension(xDimension + 4)) / WPrime),
+                                            255.0
+                                            }     
+                                );
+            } else {
+                raster.setPixel(
+                                x,
+                                y,
+                                new double[]{
+                                            (255*GammaCorection(ps[0].GetDimension(xDimension + 2))),
+                                            (255*GammaCorection(ps[0].GetDimension(xDimension + 3))),
+                                            (255*GammaCorection(ps[0].GetDimension(xDimension + 4))),
+                                            255.0
+                                            }     
+                                );
+            }
             ps[0].add(ps[1]);
         }
     }

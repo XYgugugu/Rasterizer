@@ -24,9 +24,12 @@ public class PNGmaker {
     public Flags flags;
     
     PNGmaker() {
+        flags = new Flags();
         positions = new ArrayList<>();
         colors = new ArrayList<>();
-        flags = new Flags();
+
+        elements = new ArrayList<>();
+        texcoords = new ArrayList<>();
     }
 
     // Member Functions
@@ -35,9 +38,9 @@ public class PNGmaker {
      * Create the output file
      * @param path the directory of the output image
      */
-    void createImage(String path) {
+    void createImage() {
         try {
-            ImageIO.write(image, "png", new File(path));
+            ImageIO.write(image, "png", new File(outputFileName));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -50,7 +53,7 @@ public class PNGmaker {
     }
     // Called when 'position' is called, reset and store pos-value into positions
     void processPositions(String[] positionStrings) {
-        System.out.println("Positions:");
+        // System.out.println("Positions:");
         if (!positions.isEmpty()) positions.clear();
         int size = Integer.parseInt(positionStrings[1]);
         for (int i = 2; i < positionStrings.length; i += size) {
@@ -61,18 +64,18 @@ public class PNGmaker {
             pos[4] = (pos[0]/pos[3]+1)*width/2;
             pos[5] = (pos[1]/pos[3]+1)*height/2;
             positions.add(pos);
-            System.out.print("output: ");
-            for (double p : pos) {
-                System.out.print(p + " ");
-            }
-            System.out.println("");
+            // System.out.print("output: ");
+            // for (double p : pos) {
+            //     System.out.print(p + " ");
+            // }
+            // System.out.println("");
         }
-        System.out.println("");
+        // System.out.println("");
     }
 
     // Called when 'color' is called, reset and store color-value into colors
     void processColors(String[] colorStrings) {
-        System.out.println("Colors:");
+        // System.out.println("Colors:");
         if (!colors.isEmpty()) colors.clear();
         int size = Integer.parseInt(colorStrings[1]);
         for (int i = 2; i < colorStrings.length; i+= size) {
@@ -82,25 +85,57 @@ public class PNGmaker {
                 color[off] = Double.parseDouble(colorStrings[i + off]);
             }
             colors.add(color);
-            System.out.print("color: ");
-            for (double c : color) {
-                System.out.print(c + " ");
-            }
-            System.out.println(" ");
+            // System.out.print("color: ");
+            // for (double c : color) {
+            //     System.out.print(c + " ");
+            // }
+            // System.out.println(" ");
         }
-        System.out.println(" ");
+        // System.out.println(" ");
+    }
+
+    // Called when 'elements' is called, update the List<Integer> elements with non-negative value
+    void processElements(String[] elementsStrings) {
+        if (!elements.isEmpty()) elements.clear();;
+        for (int i = 1; i < elementsStrings.length; i++) {
+            elements.add(Integer.parseInt(elementsStrings[i]));
+        }
     }
 
     // Called when 'drawArraysTriangles' is called, to create image
     void processDrawArraysTriangles(int first, int count) {
         for (int i = first; i < first + count; i += 3) {
-            Drawer drawer = new Drawer(flags, width, height, positions.get(i), positions.get(i+1), positions.get(i+2), colors.get(i), colors.get(i+1), colors.get(i+2));
-            drawer.drawArraysTriangles(raster);
+            Drawer drawer = new Drawer
+                                    (
+                                        flags, width, height, 
+                                        positions.get(i), positions.get(i+1), positions.get(i+2), 
+                                        colors.get(i), colors.get(i+1), colors.get(i+2)
+                                    );
+            drawer.drawTriangles(raster);
         }
     }
 
+    // Called when 'drawElementsTriangles' is called, to create image
+    void processDrawElementsTriangles(int count, int offset) {
+        for (int i = offset; i < offset + count; i += 3) {
+            Drawer drawer = new Drawer
+                                    (
+                                        flags, width, height, 
+                                        positions.get(elements.get(i)), positions.get(elements.get(i+1)), positions.get(elements.get(i+2)), 
+                                        colors.get(elements.get(i)), colors.get(elements.get(i+1)), colors.get(elements.get(i+2))
+                                    );
+            drawer.drawTriangles(raster);
+        }
+    }
+
+    // Flags
     // Called when 'sRGB' is presented, indication of using sRGB value instead of RGB
     void processSRGB() {
         flags.sRGB = true;
     }
+    // Called when 'hyp' is presented, indication of using hyperbolic
+    void processHYP() {
+        flags.hyp = true;
+    }
+    
 }

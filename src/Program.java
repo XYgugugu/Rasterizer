@@ -33,11 +33,11 @@ public class Program {
             while ((line = reader.readLine()) != null) {
                 // ignore useless lines
                 if (line.startsWith("#") || line.trim().isEmpty()) continue;
-                System.out.println(line);
+                // System.out.println(line);
                 String[] infos = line.split("\\s+");
                 updatePNGmaker(infos);
             }
-            pngMaker.createImage("rast-output.png");
+            pngMaker.createImage();
         } catch (IOException e) {
             System.err.println("Invalid Input File Path");
             e.printStackTrace();
@@ -73,12 +73,15 @@ public class Program {
                 pngMaker.processSRGB();
                 break;
             case "hyp":
+                pngMaker.processHYP();
                 break;
             case "elements":
+                pngMaker.processElements(infos);
                 break;
             case "uniformMatrix":
                 break;
             case "drawElementsTriangles":
+                pngMaker.processDrawElementsTriangles(Integer.parseInt(infos[1]), Integer.parseInt(infos[2]));
                 break;
             case "cull":
                 break;
