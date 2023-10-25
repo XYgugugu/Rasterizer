@@ -2,6 +2,8 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.image.WritableRaster;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 public class Drawer {
     private class Vector {
@@ -15,11 +17,13 @@ public class Drawer {
             if (hyp == true) {
                 double w = pos[3];
                 for (double d : pos) {
-                    vector[i++] = d/w;
+                    vector[i++] = d;
                 }
+                
                 for (double d : color) {
                     vector[i++] = d/w;
                 }
+                vector[2] /= w;
                 vector[3] = 1/w;
             } else {
                 for (double d : pos) {
@@ -87,7 +91,6 @@ public class Drawer {
             return a.vector[d] - b.vector[d];
         }
     }
-
     private int width, height;
     private Flags flags;
     /**
@@ -99,35 +102,42 @@ public class Drawer {
         flags = f;
         width = w;
         height = h;
+
         // Find three Vectors in order
-        if (pos0[5] < pos1[5] && pos0[5] < pos2[5]) {
-            t = new Vector(pos0, color0, f.hyp);
-            if (pos1[5] < pos2[5]) {
-                m = new Vector(pos1, color1, f.hyp);
-                b = new Vector(pos2, color2, f.hyp);
+        Vector x = new Vector(pos0, color0, f.hyp);
+        Vector y = new Vector(pos1, color1, f.hyp);
+        Vector z = new Vector(pos2, color2, f.hyp);
+        
+        //find top-mid-bot vertex based on their Y-coordinate
+        if (Vector.compare(x, y, 5) < 0 && Vector.compare(x, z, 5) < 0) {
+            t = x;
+            if (Vector.compare(y, z, 5) < 0) {
+                m = y;
+                b = z;
             } else {
-                m = new Vector(pos2, color2, f.hyp);
-                b = new Vector(pos1, color1, f.hyp);
+                m = z;
+                b = y;
             }
-        } else if (pos1[5] < pos2[5]) {
-            t = new Vector(pos1, color1, f.hyp);
-            if (pos0[5] < pos2[5]) {
-                m = new Vector(pos0, color0, f.hyp);
-                b = new Vector(pos2, color2, f.hyp);
+        } else if (Vector.compare(y, z, 5) < 0) {
+            t = y;
+            if (Vector.compare(x, z, 5) < 0) {
+                m = x;
+                b = z;
             } else {
-                m = new Vector(pos2, color2, f.hyp);
-                b = new Vector(pos0, color0, f.hyp);
+                m = z;
+                b = x;
             }
         } else {
-            t = new Vector(pos2, color2, f.hyp);
-            if (pos0[5] < pos1[5]) {
-                m = new Vector(pos0, color0, f.hyp);
-                b = new Vector(pos1, color1, f.hyp);
+            t = z;
+            if (Vector.compare(x, y, 5) < 0) {
+                m = x;
+                b = y;
             } else {
-                m = new Vector(pos1, color1, f.hyp);
-                b = new Vector(pos0, color0, f.hyp);
+                m = y;
+                b = x;
             }
         }
+    
     }
     public void drawTriangles(WritableRaster raster) {
         //dimension for Y-pos
@@ -216,31 +226,45 @@ public class Drawer {
                 ps[0].add(ps[1]);
                 continue;
             }
-            if (flags.hyp == true) {
-                // Perform a separate operation for hyperbolic mode
-                // Undo divided-by-w
-                double WPrime = ps[0].GetDimension(xDimension - 1);
-                raster.setPixel(
-                                x,
-                                y,
-                                new double[]{
-                                            (255*GammaCorection(ps[0].GetDimension(xDimension + 2)) / WPrime),
-                                            (255*GammaCorection(ps[0].GetDimension(xDimension + 3)) / WPrime),
-                                            (255*GammaCorection(ps[0].GetDimension(xDimension + 4)) / WPrime),
-                                            255.0
-                                            }     
-                                );
+            //if <depth> is enabled, ignore pixels with same (x,y), but further distance (z)
+            if (flags.depth) {
+                Double currentZ = ps[0].GetDimension(2);
+                int xy = y * width + x;
+                // System.out.println("xy: " + xy);
+                Double recordedZ = flags.depthMap.get(xy);
+                if (recordedZ != null && recordedZ < currentZ) {
+                    ps[0].add(ps[1]);
+                    continue;
+                }
+                flags.depthMap.put(xy, currentZ);
+            }
+            double WPrime = ps[0].GetDimension(xDimension - 1);
+            RGB rgb = new RGB(
+                                ps[0].GetDimension(xDimension + 2), 
+                                ps[0].GetDimension(xDimension + 3), 
+                                ps[0].GetDimension(xDimension + 4), 
+                                flags.color == 3 ? 1.0 : ps[0].GetDimension(xDimension + 5),
+                                flags.hyp,
+                                WPrime,
+                                this
+                            );
+            if (flags.color == 3) {
+                raster.setPixel(x, y, new double[]{rgb.R * 255.0, rgb.G * 255.0, rgb.B * 255.0, 255.0});
             } else {
-                raster.setPixel(
-                                x,
-                                y,
-                                new double[]{
-                                            (255*GammaCorection(ps[0].GetDimension(xDimension + 2))),
-                                            (255*GammaCorection(ps[0].GetDimension(xDimension + 3))),
-                                            (255*GammaCorection(ps[0].GetDimension(xDimension + 4))),
-                                            255.0
-                                            }     
-                                );
+                //handle transparency
+                int xy = y * width + x;
+                RGB base = flags.rgbMap.get(xy);
+                if (base == null) {
+                    //no existing base
+                    flags.rgbMap.put(xy, rgb);
+                    raster.setPixel(x, y, new double[]{rgb.R * 255.0, rgb.G * 255.0, rgb.B * 255.0, rgb.A * 255.0});
+                } else {
+                    //overlap
+                    double newA = rgb.A + base.A * (1 - rgb.A);
+                    RGB over = RGB.combine(rgb, base, newA);
+                    flags.rgbMap.put(xy, over);
+                    raster.setPixel(x, y, new double[]{over.R * 255.0, over.G * 255.0, over.B * 255.0, over.A * 255.0});
+                }
             }
             ps[0].add(ps[1]);
         }
@@ -251,7 +275,7 @@ public class Drawer {
      * @param value the color value in range of 0.0-1.0
      * @return returns the corrected color value as a double ranging 0.0-1.0
      */
-    private double GammaCorection(double value) {
+    public double GammaCorection(double value) {
         if (flags.sRGB == false) return value;
         // if (value <= 0.04045) 
         // {
@@ -269,14 +293,3 @@ public class Drawer {
         }
     }
 }
-
-
-/*
- *        // ...
-        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_4BYTE_ABGR);
-        WritableRaster raster = b.getRaster();
-        // ...
-        raster.SetPixel(x,y, new Color(red,green,blue,alpha));
-        // ...
-        ImageIO.write(image, "png", new File(filename));
- */

@@ -55,7 +55,7 @@ public class Program {
             case "png":
                 pngMaker.width = Integer.parseInt(infos[1]);
                 pngMaker.height = Integer.parseInt(infos[2]);
-                pngMaker.outputFileName = infos[3];
+                pngMaker.outputFileName = "./Output/" + infos[3];
                 pngMaker.initPNG();
                 break;
             case "position":
@@ -68,6 +68,7 @@ public class Program {
                 pngMaker.processDrawArraysTriangles(Integer.parseInt(infos[1]), Integer.parseInt(infos[2]));
                 break;
             case "depth":
+                pngMaker.processDepth();
                 break;
             case "sRGB":
                 pngMaker.processSRGB();
@@ -79,6 +80,7 @@ public class Program {
                 pngMaker.processElements(infos);
                 break;
             case "uniformMatrix":
+                pngMaker.processUniformMatrix(infos);
                 break;
             case "drawElementsTriangles":
                 pngMaker.processDrawElementsTriangles(Integer.parseInt(infos[1]), Integer.parseInt(infos[2]));

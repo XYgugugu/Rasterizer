@@ -7,6 +7,8 @@ import java.io.IOException;
 import javax.imageio.ImageIO;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;;
 
 public class PNGmaker {
@@ -19,6 +21,7 @@ public class PNGmaker {
      * positions-element: {x, y, z, w, XYx, XYy}
      */
     public List<double[]> positions, colors;
+    public List<double[]> transformedPositions;   //transformed position with uniformmatrix
     public List<Integer> elements, texcoords;
 
     public Flags flags;
@@ -64,13 +67,9 @@ public class PNGmaker {
             pos[4] = (pos[0]/pos[3]+1)*width/2;
             pos[5] = (pos[1]/pos[3]+1)*height/2;
             positions.add(pos);
-            // System.out.print("output: ");
-            // for (double p : pos) {
-            //     System.out.print(p + " ");
-            // }
-            // System.out.println("");
         }
-        // System.out.println("");
+        //Update transformed positions if there is an uniform matrix to update the positions
+        if (flags.uniformMatrix == true) UpdateTransformedPosition();
     }
 
     // Called when 'color' is called, reset and store color-value into colors
@@ -78,6 +77,8 @@ public class PNGmaker {
         // System.out.println("Colors:");
         if (!colors.isEmpty()) colors.clear();
         int size = Integer.parseInt(colorStrings[1]);
+        flags.color = size;
+        if (size == 4) flags.rgbMap = new HashMap<>();
         for (int i = 2; i < colorStrings.length; i+= size) {
             double[] color = {0.0, 0.0, 0.0, 1.0};
             for (int off = 0; off < size; off++) {
@@ -85,13 +86,7 @@ public class PNGmaker {
                 color[off] = Double.parseDouble(colorStrings[i + off]);
             }
             colors.add(color);
-            // System.out.print("color: ");
-            // for (double c : color) {
-            //     System.out.print(c + " ");
-            // }
-            // System.out.println(" ");
         }
-        // System.out.println(" ");
     }
 
     // Called when 'elements' is called, update the List<Integer> elements with non-negative value
@@ -104,11 +99,13 @@ public class PNGmaker {
 
     // Called when 'drawArraysTriangles' is called, to create image
     void processDrawArraysTriangles(int first, int count) {
+        //determine which position list to use
+        List<double[]> posList = flags.uniformMatrix ? transformedPositions : positions;
         for (int i = first; i < first + count; i += 3) {
             Drawer drawer = new Drawer
                                     (
                                         flags, width, height, 
-                                        positions.get(i), positions.get(i+1), positions.get(i+2), 
+                                        posList.get(i), posList.get(i+1), posList.get(i+2), 
                                         colors.get(i), colors.get(i+1), colors.get(i+2)
                                     );
             drawer.drawTriangles(raster);
@@ -117,18 +114,20 @@ public class PNGmaker {
 
     // Called when 'drawElementsTriangles' is called, to create image
     void processDrawElementsTriangles(int count, int offset) {
+        //determine which position list to use
+        List<double[]> posList = flags.uniformMatrix ? transformedPositions : positions;
         for (int i = offset; i < offset + count; i += 3) {
             Drawer drawer = new Drawer
                                     (
                                         flags, width, height, 
-                                        positions.get(elements.get(i)), positions.get(elements.get(i+1)), positions.get(elements.get(i+2)), 
+                                        posList.get(elements.get(i)), posList.get(elements.get(i+1)), posList.get(elements.get(i+2)), 
                                         colors.get(elements.get(i)), colors.get(elements.get(i+1)), colors.get(elements.get(i+2))
                                     );
             drawer.drawTriangles(raster);
         }
     }
 
-    // Flags
+    // Update Flags
     // Called when 'sRGB' is presented, indication of using sRGB value instead of RGB
     void processSRGB() {
         flags.sRGB = true;
@@ -137,5 +136,34 @@ public class PNGmaker {
     void processHYP() {
         flags.hyp = true;
     }
-    
+    // Called when 'depth' is presented, indication of using depth buffer
+    void processDepth() {
+        flags.depth = true;
+        flags.depthMap = new HashMap<>();
+    }
+    // Called when 'uniformMatrix' is presented, indication of multiplying the matrix to three starting vertex
+    void processUniformMatrix(String[] ns) {
+        flags.uniformMatrix = true;
+        flags.unimatrix = new double[4][4];
+        for (int i = 0; i < 16; i++) {
+            flags.unimatrix[i % 4][i / 4] = Double.parseDouble(ns[i + 1]);
+        }
+        UpdateTransformedPosition();
+    }
+    // Called when UniformMatrix/Position is updated
+    private void UpdateTransformedPosition() {
+        transformedPositions = new ArrayList<>();
+        for (double[] pos : positions) {
+            double x = pos[0], y = pos[1], z = pos[2], w = pos[3];
+            double[] tpos = new double[6];
+            tpos[0] = flags.dotProduct(x, y, z, w, 0);
+            tpos[1] = flags.dotProduct(x, y, z, w, 1);
+            tpos[2] = flags.dotProduct(x, y, z, w, 2);
+            tpos[3] = flags.dotProduct(x, y, z, w, 3);
+            tpos[4] = (tpos[0]/tpos[3]+1)*width/2;
+            tpos[5] = (tpos[1]/tpos[3]+1)*height/2;
+            transformedPositions.add(tpos);
+        }
+    }
+
 }
