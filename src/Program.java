@@ -1,10 +1,4 @@
-import java.awt.Color;
-import java.awt.image.BufferedImage;
-import java.awt.image.WritableRaster;
-import javax.imageio.ImageIO;
-
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 
@@ -56,6 +50,7 @@ public class Program {
                 pngMaker.width = Integer.parseInt(infos[1]);
                 pngMaker.height = Integer.parseInt(infos[2]);
                 pngMaker.outputFileName = "./Output/" + infos[3];
+                // pngMaker.outputFileName = infos[3];
                 pngMaker.initPNG();
                 break;
             case "position":
@@ -86,20 +81,27 @@ public class Program {
                 pngMaker.processDrawElementsTriangles(Integer.parseInt(infos[1]), Integer.parseInt(infos[2]));
                 break;
             case "cull":
+                pngMaker.processCull();
                 break;
             case "decals":
+                pngMaker.processDecals();
                 break;
             case "texture":
+                pngMaker.processTexture(infos[1]);
                 break;
             case "texcoord":
+                pngMaker.processTexcoord(infos);
                 break;
             case "frustum":
                 break;
             case "fsaa":
+                pngMaker.processFsaa(infos[1]);
                 break;
             case "pointsize":
+                pngMaker.processPointSize(infos);
                 break;
             case "drawArraysPoints":
+                pngMaker.processDrawArraysPoints(Integer.valueOf(infos[1]), Integer.valueOf(infos[2]));
                 break;
             default:
                 break;

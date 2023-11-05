@@ -18,9 +18,19 @@ public class RGB {
         B = b;
         A = a;
     }
-    public static RGB combine(RGB src, RGB dest, double ap) {
+    public static RGB combine(RGB src, RGB dest, Drawer d) {
+        double ap = src.A + dest.A * (1 - src.A);
+
+        double sR = d.ReverseGammaCorection(src.R);
+        double sG = d.ReverseGammaCorection(src.G);
+        double sB = d.ReverseGammaCorection(src.B);
+        
+        double dR = d.ReverseGammaCorection(dest.R);
+        double dG = d.ReverseGammaCorection(dest.G);
+        double dB = d.ReverseGammaCorection(dest.B);
+        
         double m = src.A / ap;
         double n = (1 - src.A) * dest.A / ap;
-        return new RGB(m * src.R + n * dest.R, m * src.G + n * dest.G, m * src.B + n * dest.B, ap);
+        return new RGB(d.GammaCorection(m * sR + n * dR), d.GammaCorection(m * sG + n * dG), d.GammaCorection(m * sB + n * dB), ap);
     }
 }

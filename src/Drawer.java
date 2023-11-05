@@ -1,17 +1,53 @@
-import java.awt.Color;
-import java.awt.Dimension;
+import java.awt.image.BufferedImage;
 import java.awt.image.WritableRaster;
+import java.io.File;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
+
+import javax.imageio.ImageIO;
 
 public class Drawer {
+
+    //static:
+    //Drawing function with FSAA enabled
+    public static void FSAAoutput(WritableRaster src, WritableRaster target, int width, int height, int fsaa) {
+        if (fsaa == 1) return;
+        Drawer d = new Drawer();
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                double[] targetRGBA = {0.0, 0.0, 0.0, 0.0};
+                int ratio = 0;
+                for (int j = y * fsaa; j < y * fsaa + fsaa; j++) {
+                    for (int i = x * fsaa; i < x * fsaa + fsaa; i++) {
+                        double[] srcRGBA = new double[4];
+                        src.getPixel(i, j, srcRGBA);
+                        if (srcRGBA[3] == 0) continue;
+                        for (int idx = 0; idx < 3; idx++) {
+                            targetRGBA[idx] += d.ReverseGammaCorection(srcRGBA[idx] / 255);
+                        }
+                        targetRGBA[3] += srcRGBA[3];
+                        // ratio += srcRGBA[3];
+                        ratio++;
+                    }
+                }
+                for (int idx = 0; idx < 3; idx++) {
+                    targetRGBA[idx] /= ratio;
+                    targetRGBA[idx] = d.GammaCorection(targetRGBA[idx]) * 255;
+                }
+                targetRGBA[3] /= (fsaa * fsaa);
+                target.setPixel(x, y, targetRGBA);
+            }
+        }
+    }
+    Drawer() {
+        flags = new Flags();
+        flags.sRGB = true;
+    }
+    // x,y,z,w,X,Y,R,G,B,A,s,t;
     private class Vector {
-        // x,y,z,w,X,Y,R,G,B,A;
         double[] vector;
         //Concatenate position and color vector into one
-        Vector(double[] pos, double[] color, boolean hyp) {
-            vector = new double[pos.length+color.length];
+        Vector(double[] pos, double[] color, double[] coord, boolean hyp) {
+            vector = new double[pos.length+color.length+coord.length];
             int i = 0;
             // Perform a separate operation for hyperbolic mode
             if (hyp == true) {
@@ -23,6 +59,9 @@ public class Drawer {
                 for (double d : color) {
                     vector[i++] = d/w;
                 }
+                for (double d : coord) {
+                    vector[i++] = d/w;
+                }
                 vector[2] /= w;
                 vector[3] = 1/w;
             } else {
@@ -30,6 +69,9 @@ public class Drawer {
                     vector[i++] = d;
                 }
                 for (double d : color) {
+                    vector[i++] = d;
+                }
+                for (double d : coord) {
                     vector[i++] = d;
                 }
             }
@@ -50,17 +92,20 @@ public class Drawer {
             return "Vector{" + "values=" + Arrays.toString(vector) + "}";
             // return Double.toString(vector[5]);
         }
-        public String XYtoString() {
-            return String.format("(%f, %f)", vector[4], vector[5]);
-        }
-        public String RGBtoString() {
-            return String.format("(rgb = (%f, %f, %f))", vector[6], vector[7], vector[8]);
-        }
+        // public String XYtoString() {
+        //     return String.format("(%f, %f)", vector[4], vector[5]);
+        // }
+        // public String RGBtoString() {
+        //     return String.format("(rgb = (%f, %f, %f))", vector[6], vector[7], vector[8]);
+        // }
         // Basic Math
         public void add(double[] v) {
             assert vector.length == v.length;
             for (int i = 0; i < vector.length; i++) {
                 vector[i] += v[i];
+                // if (i == 10 || i == 11) {
+                //     vector[i] -= Math.floor(vector[i]);
+                // }
             }
         }
         public void add(Vector p) {
@@ -70,6 +115,9 @@ public class Drawer {
             assert vector.length == v.length;
             for (int i = 0; i < vector.length; i++) {
                 vector[i] -= v[i];
+                // if (i == 10 || i == 11) {
+                //     vector[i] -= Math.floor(vector[i]);
+                // }
             }
         }
         public void sub(Vector p) {
@@ -79,12 +127,18 @@ public class Drawer {
             assert d != 0;
             for (int i = 0; i < vector.length; i++) {
                 vector[i] *= d;
+                // if (i == 10 || i == 11) {
+                //     vector[i] -= Math.floor(vector[i]);
+                // }
             }
         }
         public void divide(double d) {
             assert d != 0;
             for (int i = 0; i < vector.length; i++) {
                 vector[i] /= d;
+                // if (i == 10 || i == 11) {
+                //     vector[i] -= Math.floor(vector[i]);
+                // }
             }
         }
         public static double compare(Vector a, Vector b, int d) {
@@ -94,19 +148,33 @@ public class Drawer {
     private int width, height;
     private Flags flags;
     /**
-     * This region is specifically for:         drawTriangles
+     * This region is specifically for:         drawArraysPoints
      */
-    private Vector t, b, m;
-    // Assign three vertex in order based on Y-coordinate value
-    Drawer(Flags f, int w, int h, double[] pos0, double[] pos1, double[] pos2, double[] color0, double[] color1, double[] color2) {
+    Drawer(Flags f, int w, int h) {
         flags = f;
         width = w;
         height = h;
-
+    }
+    /**
+     * This region is specifically for:         drawTriangles
+     */
+    private Vector t, b, m;
+    private boolean cullShouldDraw = true;
+    // Assign three vertex in order based on Y-coordinate value
+    Drawer(
+            Flags f, int w, int h, 
+            double[] pos0, double[] pos1, double[] pos2, 
+            double[] color0, double[] color1, double[] color2,
+            double[] coord0, double[] coord1, double[] coord2
+            ) {
+        flags = f;
+        width = w;
+        height = h;
+        if (flags.cull) cullShouldDraw = CullIsOutter(pos0, pos1, pos2);
         // Find three Vectors in order
-        Vector x = new Vector(pos0, color0, f.hyp);
-        Vector y = new Vector(pos1, color1, f.hyp);
-        Vector z = new Vector(pos2, color2, f.hyp);
+        Vector x = new Vector(pos0, color0, coord0, f.hyp);
+        Vector y = new Vector(pos1, color1, coord1, f.hyp);
+        Vector z = new Vector(pos2, color2, coord2, f.hyp);
         
         //find top-mid-bot vertex based on their Y-coordinate
         if (Vector.compare(x, y, 5) < 0 && Vector.compare(x, z, 5) < 0) {
@@ -140,6 +208,8 @@ public class Drawer {
     
     }
     public void drawTriangles(WritableRaster raster) {
+        //If <cull> enabled and triangle is an inner triangle, do nothing
+        if (cullShouldDraw == false) return;
         //dimension for Y-pos
         int d = 5;
         //DDA t to b:
@@ -218,6 +288,21 @@ public class Drawer {
         Vector[] ps = DDA17(a, b, xDimension);
         if (ps == null) return;
         double endPoint = Math.max(a.GetDimension(xDimension), b.GetDimension(xDimension));
+        
+        BufferedImage textureIMG = null;
+        WritableRaster textureRaster = null;
+        int textureWidth = 0, textureHeight = 0;
+        if (flags.colorOrTexture > 0) {
+            try {
+                textureIMG = ImageIO.read(new File(flags.texturePath));
+                textureRaster = textureIMG.getRaster();
+                textureWidth = textureRaster.getWidth();
+                textureHeight = textureRaster.getHeight();
+            } catch (Exception e) {
+                System.out.println("Can not access " + flags.texturePath);
+            }
+        }
+
         while (ps[0].GetDimension(xDimension) < endPoint) {
             // System.out.println(String.format("(x,y) = (%f, %f)", ps[0].GetDimension(xDimension), ps[0].GetDimension(xDimension + 1)));
             int x = (int) ps[0].GetDimension(xDimension);
@@ -239,6 +324,7 @@ public class Drawer {
                 flags.depthMap.put(xy, currentZ);
             }
             double WPrime = ps[0].GetDimension(xDimension - 1);
+            
             RGB rgb = new RGB(
                                 ps[0].GetDimension(xDimension + 2), 
                                 ps[0].GetDimension(xDimension + 3), 
@@ -248,7 +334,31 @@ public class Drawer {
                                 WPrime,
                                 this
                             );
-            if (flags.color == 3) {
+            //textures are involved
+            if (flags.colorOrTexture > 0) {
+                //compute texture pixel to <RGB rgb>
+                double s = ps[0].GetDimension(10)  / (flags.hyp ? WPrime : 1);
+                double t = ps[0].GetDimension(11)  / (flags.hyp ? WPrime : 1);
+                s -= Math.floor(s);
+                t -= Math.floor(t);
+                int tx = (int) (textureWidth * s);
+                int ty = (int) (textureHeight * t);
+                double[] textureRGBA = textureRaster.getPixel(tx, ty, new double[4]);
+                RGB TextureRGBA = new RGB(textureRGBA[0] / 255.0, textureRGBA[1] / 255.0, textureRGBA[2] / 255.0, (flags.color == 3 && flags.decals == false) ? 1.0 : textureRGBA[3] / 255.0);
+                if (flags.colorOrTexture == 2)  //both textures and vertex colors are involved
+                {
+                    //compute the vertex color: the base
+                    RGB vertexRGBA = rgb;
+                    //compute the actual pixel color
+                    rgb = RGB.combine(TextureRGBA, vertexRGBA, this);
+                } 
+                else                            //only textures colors are used
+                {
+                    rgb = TextureRGBA;
+                }
+            }
+
+            if (flags.decals == false && flags.color == 3) {
                 raster.setPixel(x, y, new double[]{rgb.R * 255.0, rgb.G * 255.0, rgb.B * 255.0, 255.0});
             } else {
                 //handle transparency
@@ -260,8 +370,12 @@ public class Drawer {
                     raster.setPixel(x, y, new double[]{rgb.R * 255.0, rgb.G * 255.0, rgb.B * 255.0, rgb.A * 255.0});
                 } else {
                     //overlap
-                    double newA = rgb.A + base.A * (1 - rgb.A);
-                    RGB over = RGB.combine(rgb, base, newA);
+                    RGB over = RGB.combine(rgb, base, this);
+                    // if (x == 75 && y == 75) {
+                    //     System.out.println(String.format("Base:\t(%f, %f, %f, %f)", base.R*255.0, base.G*255.0, base.B*255.0, base.A*255.0));
+                    //     System.out.println(String.format("New:\t(%f, %f, %f, %f)", rgb.R*255.0, rgb.G*255.0, rgb.B*255.0, rgb.A*255.0));
+                    //     System.out.println(String.format("Combine:\t(%f, %f, %f, %f)", over.R*255.0, over.G*255.0, over.B*255.0, over.A*255.0));
+                    // }
                     flags.rgbMap.put(xy, over);
                     raster.setPixel(x, y, new double[]{over.R * 255.0, over.G * 255.0, over.B * 255.0, over.A * 255.0});
                 }
@@ -269,6 +383,67 @@ public class Drawer {
             ps[0].add(ps[1]);
         }
     }
+    
+    /**
+     * Draw single square
+     * @param color Is null when texture is used instead
+     */
+    public void drawSquare(WritableRaster raster, double[] pos, double diameter, double[] color) {
+        double z = pos[2];
+        double offset = diameter / 2;
+        int x = (int) Math.floor(Math.max(0, pos[4] - offset)), y = (int) Math.floor(Math.max(0, pos[5] - offset));
+        if (color != null) //draw with given color 
+        {
+            
+            RGB rgb = new RGB(color[0], color[1], color[2], color[3], false, 0, this);
+            for (int j = y; j < (int) Math.floor(Math.min(y + diameter, height)); j++) {
+                for (int i = x; i < (int) Math.floor(Math.min(x + diameter, width)); i++) {
+                    //if <depth> is enabled, ignore pixels with same (x,y), but further distance (z)
+                    if (flags.depth) {
+                        int ij = j * width + i;
+                        Double recordedZ = flags.depthMap.get(ij);
+                        if (recordedZ != null && recordedZ < z) {
+                            continue;
+                        }
+                        flags.depthMap.put(ij, z);
+                    }
+                    raster.setPixel(i, j, new double[]{rgb.R * 255.0, rgb.G * 255.0, rgb.B * 255.0, 255.0});
+                }
+            }
+        }
+        else                //draw with textures
+        {
+            try {
+                //set up
+                BufferedImage textureIMG = ImageIO.read(new File(flags.texturePath));
+                WritableRaster textureRaster = textureIMG.getRaster();
+                int textureWidth = textureRaster.getWidth(), textureHeight = textureRaster.getHeight();
+                int jd = (int) Math.floor(Math.min(y + diameter, height));
+                int id = (int) Math.floor(Math.min(x + diameter, width));
+                for (int j = y; j < jd; j++) {
+                    for (int i = x; i < id; i++) {
+                        int ij = j * width + i;
+                        Double recordedZ = flags.depthMap.get(ij);
+                        if (recordedZ != null && recordedZ < z) {
+                            continue;
+                        }
+                        flags.depthMap.put(ij, z);
+
+                        int tx = (int) (textureWidth * (1.0 * (i - x) / (id - x)));
+                        int ty = (int) (textureHeight * (1.0 * (j - y) / (jd - y)));
+                        double[] textureRGBA = textureRaster.getPixel(tx, ty, new double[4]);
+                        raster.setPixel(i, j, textureRGBA);
+
+                        // raster.setPixel(i, j, new double[]{0,0,0,255});
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("Can not access " + flags.texturePath);
+                e.printStackTrace();
+            }
+        }
+    }
+
     /**
      * Called to perform Gamma Correction on a color value
      * Gamma Correction will only be done if and only if Flags.sRGB == true
@@ -277,13 +452,6 @@ public class Drawer {
      */
     public double GammaCorection(double value) {
         if (flags.sRGB == false) return value;
-        // if (value <= 0.04045) 
-        // {
-        //     return (value / 12.92);
-        // } else 
-        // {
-        //     return (Math.pow(((value + 0.055) / 1.055), 2.4));
-        // }
         if (value <= 0.0031308) 
         {
             return 12.92 * value;
@@ -291,5 +459,34 @@ public class Drawer {
         {
             return 1.055 * Math.pow(value, 1/2.4) - 0.055;
         }
+    }
+    /**
+     * Reverse version of Gamma Correction as previous
+     */
+    public double ReverseGammaCorection(double value) {
+        if (flags.sRGB == false) return value;
+        if (value <= 0.04045) 
+        {
+            return (value / 12.92);
+        } else 
+        {
+            return (Math.pow(((value + 0.055) / 1.055), 2.4));
+        }
+    }
+
+    /**
+     * @return true if <cull> is disabled or triangle is counter clockwise (outter)
+     */
+    private boolean CullIsOutter(double[] pos0, double[] pos1, double[] pos2) {
+        // x = pos[4] and y = pos[5]
+        double xlong = pos0[4] - pos1[4];
+        double ylong = pos0[5] - pos1[5];
+
+        double xshort = pos1[4] - pos2[4];
+        double yshort = pos1[5] - pos2[5];
+
+        double crossProduct = xlong * yshort - xshort * ylong;
+
+        return crossProduct < 0;
     }
 }
