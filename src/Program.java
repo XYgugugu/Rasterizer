@@ -49,8 +49,8 @@ public class Program {
             case "png":
                 pngMaker.width = Integer.parseInt(infos[1]);
                 pngMaker.height = Integer.parseInt(infos[2]);
-                pngMaker.outputFileName = "./Output/" + infos[3];
-                // pngMaker.outputFileName = infos[3];
+                // pngMaker.outputFileName = "./Output/" + infos[3];
+                pngMaker.outputFileName = infos[3];
                 pngMaker.initPNG();
                 break;
             case "position":

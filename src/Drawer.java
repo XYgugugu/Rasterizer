@@ -391,14 +391,33 @@ public class Drawer {
     public void drawSquare(WritableRaster raster, double[] pos, double diameter, double[] color) {
         double z = pos[2];
         double offset = diameter / 2;
-        int x = (int) Math.floor(Math.max(0, pos[4] - offset)), y = (int) Math.floor(Math.max(0, pos[5] - offset));
+        // int x = (int) Math.ceil(Math.max(0, pos[4] - offset)), y = (int) Math.ceil(Math.max(0, pos[5] - offset));
+        int x = (int) Math.ceil(pos[4] - offset);
+        int y = (int) Math.ceil(pos[5] - offset);
+        
         if (color != null) //draw with given color 
         {
-            
             RGB rgb = new RGB(color[0], color[1], color[2], color[3], false, 0, this);
-            for (int j = y; j < (int) Math.floor(Math.min(y + diameter, height)); j++) {
-                for (int i = x; i < (int) Math.floor(Math.min(x + diameter, width)); i++) {
-                    //if <depth> is enabled, ignore pixels with same (x,y), but further distance (z)
+            // for (int j = y; j < (int) Math.ceil(Math.min(pos[5] + offset, height)); j++) {
+            //     for (int i = x; i < (int) Math.ceil(Math.min(pos[4] + offset, width)); i++) {
+            //         //if <depth> is enabled, ignore pixels with same (x,y), but further distance (z)
+            //         if (flags.depth) {
+            //             int ij = j * width + i;
+            //             Double recordedZ = flags.depthMap.get(ij);
+            //             if (recordedZ != null && recordedZ < z) {
+            //                 continue;
+            //             }
+            //             flags.depthMap.put(ij, z);
+            //         }
+            //         raster.setPixel(i, j, new double[]{rgb.R * 255.0, rgb.G * 255.0, rgb.B * 255.0, 255.0});
+            //     }
+            // }
+            for (int j = y; j < (int) Math.ceil(pos[5] + offset); j++) {
+                if (j < 0) continue;
+                if (j >= height) break;
+                for (int i = x; i < (int) Math.ceil(pos[4] + offset); i++) {
+                    if (i < 0) continue;
+                    if (i >= width) break;
                     if (flags.depth) {
                         int ij = j * width + i;
                         Double recordedZ = flags.depthMap.get(ij);
@@ -418,25 +437,55 @@ public class Drawer {
                 BufferedImage textureIMG = ImageIO.read(new File(flags.texturePath));
                 WritableRaster textureRaster = textureIMG.getRaster();
                 int textureWidth = textureRaster.getWidth(), textureHeight = textureRaster.getHeight();
-                int jd = (int) Math.floor(Math.min(y + diameter, height));
-                int id = (int) Math.floor(Math.min(x + diameter, width));
-                for (int j = y; j < jd; j++) {
-                    for (int i = x; i < id; i++) {
-                        int ij = j * width + i;
-                        Double recordedZ = flags.depthMap.get(ij);
-                        if (recordedZ != null && recordedZ < z) {
-                            continue;
-                        }
-                        flags.depthMap.put(ij, z);
+                // int jd = (int) Math.floor(Math.min(diameter, height - y));
+                // int id = (int) Math.floor(Math.min(diameter, width - x));
+                // for (int j = y; j < (int) Math.ceil(Math.min(pos[5] + offset, height)); j++) {
+                //     for (int i = x; i < (int) Math.ceil(Math.min(pos[4] + offset, width)); i++) {
+                //         if (flags.depth) {
+                //             int ij = j * width + i;
+                //             Double recordedZ = flags.depthMap.get(ij);
+                //             if (recordedZ != null && recordedZ < z) {
+                //                 continue;
+                //             }
+                //             flags.depthMap.put(ij, z);
+                //         }
+                //         double rx = (1.0 * (i - x) / diameter);
+                //         rx -= Math.floor(rx);
+                //         double ry = (1.0 * (j - y) / diameter);
+                //         ry -= Math.floor(ry);
+                //         int tx = (int) Math.ceil(textureWidth * rx);
+                //         int ty = (int) Math.ceil(textureHeight * ry);
+                //         double[] textureRGBA = textureRaster.getPixel(tx, ty, new double[4]);
+                //         raster.setPixel(i, j, textureRGBA);
 
-                        int tx = (int) (textureWidth * (1.0 * (i - x) / (id - x)));
-                        int ty = (int) (textureHeight * (1.0 * (j - y) / (jd - y)));
+                //         // raster.setPixel(i, j, new double[]{0,0,0,255});
+                //     }
+                // }
+                for (int j = y; j < (int) Math.ceil(pos[5] + offset); j++) {
+                    if (j < 0) continue;
+                    if (j >= height) break;
+                    for (int i = x; i < (int) Math.ceil(pos[4] + offset); i++) {
+                        if (i < 0) continue;
+                        if (i >= width) break;
+                        if (flags.depth) {
+                            int ij = j * width + i;
+                            Double recordedZ = flags.depthMap.get(ij);
+                            if (recordedZ != null && recordedZ < z) {
+                                continue;
+                            }
+                            flags.depthMap.put(ij, z);
+                        }
+                        double rx = 1.0 * (i - x) / diameter;
+                        double ry = 1.0 * (j - y) / diameter;
+                        rx -= Math.floor(rx);
+                        ry -= Math.floor(ry);
+                        int tx = (int) (textureWidth * rx);
+                        int ty = (int) (textureHeight * ry);
                         double[] textureRGBA = textureRaster.getPixel(tx, ty, new double[4]);
                         raster.setPixel(i, j, textureRGBA);
-
-                        // raster.setPixel(i, j, new double[]{0,0,0,255});
                     }
                 }
+
             } catch (Exception e) {
                 System.out.println("Can not access " + flags.texturePath);
                 e.printStackTrace();
